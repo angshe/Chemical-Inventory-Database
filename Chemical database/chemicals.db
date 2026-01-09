@@ -1,0 +1,11 @@
+CREATE TABLE chemical {
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name TEXT NOT NULL,
+    cid TEXT NOT NULL,
+    formula TEXT NOT NULL,
+    molar_mass REAL NOT NULL,
+    melting_point REAL NOT NULL,
+    boiling_point REAL NOT NULL,
+    quantity REAL NOT NULL,
+    
+}

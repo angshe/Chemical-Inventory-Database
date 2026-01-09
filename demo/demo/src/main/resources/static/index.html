@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Chemical Database</title>
+</head>
+
+<body>
+
+    <div id="viewer" style="width:600px; height:600px;"></div>
+
+    <input id="quantity" placeholder="Quantity">
+    <input id="input" placeholder="CID or chemical name">
+    <button onclick="addMolecule()">Add</button>
+    <button onclick="subtractMolecule()">Subtract</button>
+
+    <h2>Current Inventory</h2>
+
+    <style>
+        .inventory-table {
+            border: 1px solid black;
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        .inventory-table th,
+        .inventory-table td {
+            border: 1px solid black;
+            padding: 8px;
+        }
+    </style>
+
+    <table class="inventory-table">
+        <thead>
+            <tr>
+                <th>Molecule</th>
+                <th>CID</th>
+                <th>Quantity</th>
+            </tr>
+        </thead>
+        <tbody id="inventoryTable"></tbody>
+    </table>
+
+    <script src="https://3dmol.csb.pitt.edu/build/3Dmol-min.js"></script>
+    <script>
+        const viewer = $3Dmol.createViewer(document.getElementById("viewer"), {
+            backgroundColor: "white"
+        });
+
+        function loadMolecule() {
+            const value = document.getElementById("input").value.trim();
+            if (!value) { alert("Enter CID or name"); return; }
+
+            const isCID = !isNaN(value);
+            const url = isCID
+                ? `/api/pubchem/cid/${value}`
+                : `/api/pubchem/name/${encodeURIComponent(value)}`;
+
+            console.log("Fetching URL:", url);
+
+            fetch(url)
+                .then(res => {
+                    console.log("HTTP status:", res.status);
+                    if (!res.ok) throw new Error("HTTP " + res.status);
+                    return res.text();
+                })
+                .then(sdf => {
+                    console.log("SDF length:", sdf.length);
+
+                    viewer.clear();
+                    viewer.addModel(sdf, "sdf");
+                    viewer.setStyle({}, { stick: {} });
+                    viewer.zoomTo();
+                    viewer.render();
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Failed to render molecule: " + err.message);
+                });
+        }
+
+        function loadInventory() {
+            fetch("/api/molecules/all")
+                .then(res => res.json())
+                .then(data => {
+                    const table = document.getElementById("inventoryTable");
+                    table.innerHTML = "";
+
+                    data.sort((a, b) =>
+                        a.name.localeCompare(b.name, undefined, {sensitivity: "base"})
+                    );
+                
+
+                    data.forEach(mol => {
+                        if (mol.quantity != 0) {
+
+                            const row = document.createElement("tr");
+
+                            const nameCell = document.createElement("td");
+                            nameCell.textContent = mol.name;
+
+                            const cidCell = document.createElement("td");
+                            cidCell.textContent = mol.cid;
+
+                            const qtyCell = document.createElement("td");
+                            qtyCell.textContent = mol.quantity;
+
+                            row.appendChild(nameCell);
+                            row.appendChild(cidCell);
+                            row.appendChild(qtyCell);
+                            table.appendChild(row);
+                        }
+                    });
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Failed to load inventory");
+                });
+        }
+
+        function addMolecule() {
+            const identifier = document.getElementById("input").value.trim();
+            const quantity = parseFloat(document.getElementById("quantity").value);
+
+            if (!identifier || isNaN(quantity)) {
+                alert("Enter molecule and quantity");
+                return;
+            }
+
+            fetch(`/api/molecules/add?identifier=${encodeURIComponent(identifier)}&quantity=${quantity}`, {
+                method: "POST"
+            })
+                .then(res => {
+                    console.log("HTTP status:", res.status);
+                    if (!res.ok) throw new Error("HTTP " + res.status);
+                    return res.json();
+                })
+                .then(data => {
+                    loadInventory();
+                    alert(`Stored ${data.name}, total quantity: ${data.quantity}`);
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Failed to add to molecule quantity");
+                });
+            loadMolecule();
+        }
+
+        function subtractMolecule() {
+            const identifier = document.getElementById("input").value.trim();
+            const quantity = parseFloat(document.getElementById("quantity").value);
+
+            if (!identifier || isNaN(quantity)) {
+                alert("Enter molecule and quantity");
+                return;
+            }
+
+            fetch(`/api/molecules/subtract?identifier=${encodeURIComponent(identifier)}&quantity=${quantity}`, {
+                method: "POST"
+            })
+                .then(res => {
+                    console.log("HTTP status:", res.status);
+                    if (!res.ok) throw new Error("HTTP " + res.status);
+                    return res.json();
+                })
+                .then(data => {
+                    loadInventory();
+                    alert(`Stored ${data.name}, total quantity: ${data.quantity}`);
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Failed to subtract from molecule quantity");
+                });
+            loadMolecule();
+        }
+
+        loadInventory();
+    </script>
+
+</body>
+
+</html>
